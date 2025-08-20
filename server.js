@@ -3,35 +3,36 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const nunjucks = require('nunjucks');
+require('dotenv').config(); // <-- ADD THIS LINE to load .env variables
 
+// --- INITIALIZATION ---
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MONGOURL = process.env.MONGOURL
+const MONGOURL = process.env.MONGOURL; // Now this will work
 const serverStartTime = new Date();
 
 // --- NUNJUCKS CONFIGURATION ---
-nunjucks.configure('public', { // 2. Point Nunjucks to your 'public' folder
+nunjucks.configure('public', {
     autoescape: true,
     express: app
 });
-app.set('view engine', 'html'); // 3. Tell Express to use Nunjucks for .html files
+app.set('view engine', 'html');
 
 // --- DATABASE CONNECTION ---
-
-mongoose.connect('mongodb://localhost:27017/cyberShieldDB')
+mongoose.connect(MONGOURL)
   .then(() => console.log('MongoDB connected successfully.'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// --- DATABASE SCHEMA ---
+// --- DATABASE SCHEMA (with unique constraints) ---
 const registrationSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    rollNo: { type: String, required: true },
-    regNo: { type: String, required: true },
-    year: { type: String, required: true },
-    phone: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    paymentScreenshot: { type: String, required: true },
-    timestamp: { type: Date, default: Date.now }
+  name: { type: String, required: true },
+  rollNo: { type: String, required: true, unique: true },
+  regNo: { type: String, required: true, unique: true },
+  year: { type: String, required: true },
+  phone: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  paymentScreenshot: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now }
 });
 const Registration = mongoose.model('Registration', registrationSchema);
 
@@ -48,33 +49,51 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+
 // --- ROUTES ---
 
 // 1. Render the homepage using Nunjucks
 app.get('/', (req, res) => {
-    // Pass a 'title' variable to the template
-    res.render('index.html', { title: 'Cyber Shield 2025' }); 
+    res.render('index.html', { title: 'Cyber Shield 2025' });
 });
 
-// 2. Handle form submission
+// 2. Handle form submission with duplicate checks
 app.post('/register', upload.single('screenshot'), async (req, res) => {
     try {
         const { name, rollNo, regNo, year, phone, email } = req.body;
+
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'Payment screenshot is required.' });
         }
+
+        const existingRegistration = await Registration.findOne({
+            $or: [{ email }, { phone }, { regNo }, { rollNo }]
+        });
+
+        if (existingRegistration) {
+            let field = 'details';
+            if (existingRegistration.email === email) field = 'email';
+            else if (existingRegistration.phone === phone) field = 'phone number';
+            else if (existingRegistration.regNo === regNo) field = 'registration number';
+            else if (existingRegistration.rollNo === rollNo) field = 'roll number';
+            
+            return res.status(409).json({ success: false, message: `This ${field} is already registered.` });
+        }
+
         const newRegistration = new Registration({
             name, rollNo, regNo, year, phone, email,
             paymentScreenshot: req.file.path
         });
+
         await newRegistration.save();
         res.status(201).json({ success: true, message: 'Registration successful!' });
+
     } catch (error) {
         if (error.code === 11000) {
-            return res.status(409).json({ success: false, message: 'This email is already registered.' });
+            return res.status(409).json({ success: false, message: 'A user with these details is already registered.' });
         }
         console.error('Registration error:', error);
-        res.status(500).json({ success: false, message: 'An error occurred.' });
+        res.status(500).json({ success: false, message: 'An internal server error occurred.' });
     }
 });
 
