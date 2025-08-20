@@ -6,6 +6,7 @@ const nunjucks = require('nunjucks');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const MONGOURL = process.env.MONGOURL
 const serverStartTime = new Date();
 
 // --- NUNJUCKS CONFIGURATION ---
@@ -16,6 +17,7 @@ nunjucks.configure('public', { // 2. Point Nunjucks to your 'public' folder
 app.set('view engine', 'html'); // 3. Tell Express to use Nunjucks for .html files
 
 // --- DATABASE CONNECTION ---
+
 mongoose.connect('mongodb://localhost:27017/cyberShieldDB')
   .then(() => console.log('MongoDB connected successfully.'))
   .catch(err => console.error('MongoDB connection error:', err));
