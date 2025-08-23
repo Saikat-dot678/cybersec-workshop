@@ -3,12 +3,12 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const nunjucks = require('nunjucks');
-require('dotenv').config(); // <-- ADD THIS LINE to load .env variables
+require('dotenv').config();
 
 // --- INITIALIZATION ---
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MONGOURL = process.env.MONGOURL; // Now this will work
+const MONGOURL = process.env.MONGOURL;
 const serverStartTime = new Date();
 
 // --- NUNJUCKS CONFIGURATION ---
